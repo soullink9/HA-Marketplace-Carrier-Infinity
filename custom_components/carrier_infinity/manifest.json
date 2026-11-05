@@ -1,0 +1,19 @@
+{
+  "domain": "carrier_infinity",
+  "name": "Carrier Infinity (Cloud)",
+  "codeowners": [
+    "@soullink9"
+  ],
+  "config_flow": true,
+  "documentation": "https://github.com/soullink9/HA-Marketplace-Carrier-Infinity",
+  "integration_type": "hub",
+  "iot_class": "cloud_push",
+  "issue_tracker": "https://github.com/soullink9/HA-Marketplace-Carrier-Infinity/issues",
+  "loggers": [
+    "carrier_api"
+  ],
+  "requirements": [
+    "carrier-api==3.6.2"
+  ],
+  "version": "1.2.0"
+}

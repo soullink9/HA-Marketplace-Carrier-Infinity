@@ -1,0 +1,46 @@
+# Checks every push and pull request, weekly (to catch Home Assistant changes), and on demand.
+# Everything here except hassfest can also be run locally; see CONTRIBUTING.md.
+name: CI
+
+on:
+  push:
+  pull_request:
+  schedule:
+    - cron: "0 6 * * 1"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  lint:
+    name: Lint and format (ruff)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: pip install ruff
+      - run: ruff check
+      - run: ruff format --check
+
+  hassfest:
+    name: Home Assistant's integration checks (hassfest)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: home-assistant/actions/hassfest@master
+
+  tests:
+    name: Tests (integration tests, 3-year electricity simulation)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.14"
+      - run: pip install -r tests/requirements.txt
+      - run: python tests/test_integration.py
+      # every scenario x two seeds, 3 years each (the full check is 30 years: see CONTRIBUTING.md)
+      - run: python tests/test_energy_soak.py 3 2
