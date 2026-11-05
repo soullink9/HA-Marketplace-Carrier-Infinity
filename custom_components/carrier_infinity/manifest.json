@@ -1,6 +1,10 @@
 {
   "domain": "carrier_infinity",
   "name": "Carrier Infinity (Cloud)",
+  "categories": [
+    "climate.thermostats_heating",
+    "energy.meters_monitoring"
+  ],
   "codeowners": [
     "@soullink9"
   ],
