@@ -18,7 +18,7 @@ from unittest.mock import MagicMock
 from zoneinfo import ZoneInfo
 
 REPO = Path(__file__).resolve().parents[1]
-FIXTURES = REPO / "tests" / "carrier_infinity" / "fixtures"
+FIXTURES = REPO / "tests" / "fixtures"
 sys.path.insert(0, str(REPO / "custom_components"))  # so `import carrier_infinity` finds the integration
 
 TZ = ZoneInfo("America/New_York")
