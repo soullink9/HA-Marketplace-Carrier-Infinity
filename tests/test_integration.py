@@ -333,7 +333,9 @@ def test_files():
     check("every form, error and sensor has its text", not missing, missing)
 
     manifest = json.loads((base / "manifest.json").read_text())
-    changelog = re.search(r"^## (\S+)", (REPO / "CHANGELOG.md").read_text(), re.M)
+    # The newest released section: a heading that starts with a version number, so "## Unreleased" (where changes
+    # wait for the next release, above the newest version) is skipped.
+    changelog = re.search(r"^## (\d\S*)", (REPO / "CHANGELOG.md").read_text(), re.M)
     check(
         "manifest version matches the newest CHANGELOG entry",
         changelog and changelog.group(1) == manifest["version"],

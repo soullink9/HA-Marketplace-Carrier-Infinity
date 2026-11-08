@@ -11,6 +11,8 @@
   publishing on Gitea. Every release's notes now start with how to install it.
 - The release's zip is now always `carrier_infinity.zip` (it had the version in its name), so
   `.../releases/latest/download/carrier_infinity.zip` always gets the newest. Each zip is checked before it's published.
+- The test that the manifest's version matches the changelog skips `## Unreleased` and reads the newest released
+  version, so changes can wait under Unreleased without failing the tests.
 
 ## 1.2.0 (2026-11-04)
 
