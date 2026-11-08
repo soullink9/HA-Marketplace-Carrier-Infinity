@@ -52,4 +52,22 @@ python3 tests/test_energy_soak.py
   readings, Carrier's New Year quirks) and checks the electricity meter ends within a few kWh of Carrier's figures.
   `python3 tests/test_energy_soak.py 30 6` is the full check before releasing a meter change.
 
-CI runs the integration tests, a 3-year simulation, `ruff` and Home Assistant's `hassfest` on every push.
+Gitea's runner runs the integration tests, a 3-year simulation, `ruff`, `tests/test_release.py` and the zip build on every
+push; GitHub adds Home Assistant's `hassfest` and the Marketplace's checks. The file table below says which file does what.
+
+## Tests and releases: the files
+
+Gitea is the main copy of this repository; it push-mirrors to GitHub, the public copy people install from.
+
+| File | What it does |
+|---|---|
+| `.gitea/workflows/test.yml` | Runs every check on each push to Gitea (lint, the tests and building the zip, on Python 3.14), with no actions downloaded from GitHub |
+| `.gitea/workflows/release.yml` | Publishes a release on Gitea (Run workflow button, or a pushed version tag); its tag then reaches GitHub through the push mirror |
+| `.github/workflows/release.yml` | Publishes the same release on GitHub when a version tag arrives there (or from its own Run workflow button): the copy the Marketplace installs from |
+| `.github/workflows/ci.yml` | GitHub's checks on every push: lint, the tests and Home Assistant's `hassfest` (which comes from GitHub, so it runs only there) |
+| `.github/workflows/validate.yml` | The Marketplace's own checks (the HACS action), which its catalog requires; GitHub only, for the same reason |
+| `scripts/release_notes.py` | Shared by both release workflows: checks the version, gives the release's title, writes the notes (install steps with the zip's address on GitHub, then the changelog section) |
+| `scripts/build_package.py` | Builds `dist/carrier_infinity.zip`, the same bytes every time, and checks it with `check_package.py` |
+| `scripts/check_package.py` | Checks the zip the way it gets installed: one `carrier_infinity/` folder, a manifest for that domain at the repository's version, the icon, exactly the integration's files |
+| `scripts/publish_gitea_release.py` | Creates or updates the Gitea release and uploads its files, through Gitea's API (standard library only) |
+| `tests/test_release.py` | Tests all four scripts, publishing against a fake Gitea server |

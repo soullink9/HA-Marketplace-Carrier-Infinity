@@ -39,8 +39,13 @@ tests/
   stubs.py             small stand-ins for Home Assistant (and for carrier_api's network layer)
   test_integration.py  the whole integration against recorded Carrier data
   test_energy_soak.py  years-long simulation of the electricity meter
+  test_release.py      the release scripts, publishing against a fake Gitea server
   fixtures/            recorded Carrier responses (from carrier_api's tests; see fixtures/README.md)
-  requirements.txt     what the tests need: carrier-api
+  requirements.txt     what the tests need: carrier-api (and ruff)
+  README.md            what each test checks
+scripts/               the release helpers both release workflows use (see Releasing)
+.gitea/workflows/      tests and releases on Gitea, the main copy (no GitHub needed)
+.github/workflows/     GitHub's checks (hassfest, the Marketplace's) and its copy of each release
 ```
 
 The usual places to make a change:
@@ -71,6 +76,8 @@ pip install -r tests/requirements.txt
 | `python3 tests/test_integration.py` | seconds | every change |
 | `python3 tests/test_energy_soak.py` | a few minutes (12 years, 6 seeds, all scenarios, on all cores) | any change to `sensor.py` or `coordinator.py` |
 | `python3 tests/test_energy_soak.py 30 6` | longer | before releasing a change to the electricity meter |
+| `python3 tests/test_release.py` | seconds | any change to `scripts/` or the release workflows |
+| `python3 scripts/build_package.py` | seconds | builds `dist/carrier_infinity.zip` and checks it installs; the workflows run it on every push |
 
 The simulation plays years of a thermostat hour by hour: restarts, crashes, outages of up to 20 months, bad
 readings, and Carrier's quirks (a late New Year, a stale or missing "last year" figure, once-a-day updates). It ends
@@ -78,8 +85,10 @@ with `N/N runs within bounds`; each run must finish within a few kWh of Carrier'
 data that no meter could have seen.
 
 The tests use stand-ins for Home Assistant (`tests/stubs.py`), written to match Home Assistant 2026.9. If Home
-Assistant changes an API the integration uses, update the stand-in to match. GitHub Actions runs the lint, the
-tests, a 3-year simulation, `hassfest` on every push.
+Assistant changes an API the integration uses, update the stand-in to match. Gitea's runner checks every push
+(`.gitea/workflows/test.yml`: the lint, the tests, a 3-year simulation, building the zip); on GitHub, the same
+checks run plus Home Assistant's `hassfest` and the Marketplace's own checks, which come from GitHub and can only run
+there. [tests/README.md](tests/README.md) lists what each test checks.
 
 Code style: `ruff` settles formatting and import order (see `pyproject.toml`). Every function and class has a
 docstring, and comments say why, not what.
@@ -155,12 +164,41 @@ chore: update the CI actions
 
 ## Releasing
 
-1. Change `version` in `custom_components/carrier_infinity/manifest.json`.
-2. Add the release to the top of `CHANGELOG.md` (the tests fail if the two disagree).
+Gitea is the main copy of this repository. It push-mirrors to GitHub, which is the public copy: the Marketplace
+installs from GitHub's releases, so every link in the docs and release notes points there.
+
+1. Change `version` in `custom_components/carrier_infinity/manifest.json`. Versions go up together: there is only
+   this one.
+2. Add the release to the top of [CHANGELOG.md](CHANGELOG.md), under a heading `## X.Y.Z (date)` (move what's under
+   `## Unreleased` into it). The tests fail if the manifest and the newest changelog section disagree.
 3. Run the checks above.
-4. Publish it: push the tag (`git tag vX.Y.Z && git push origin vX.Y.Z`), or open **Actions → Release → Run
-   workflow** and enter the version. The [Release workflow](.github/workflows/release.yml) checks the manifest
-   and `CHANGELOG.md` are at that version, then publishes the GitHub release the Marketplace installs from.
+4. Commit and push to Gitea, then publish with Gitea's **Release** workflow (`.gitea/workflows/release.yml`),
+   either way:
+   - **Actions → Release → Run workflow**, and enter the version without the `v` (for example `1.2.1`). It
+     creates the tag `v1.2.1` on the commit it releases.
+   - or push a version tag: `git tag v1.2.1 && git push origin v1.2.1`.
+
+   The workflow checks the version matches the manifest and `CHANGELOG.md` (`scripts/release_notes.py`), runs every
+   check, builds `carrier_infinity.zip` and checks it installs as `custom_components/carrier_infinity/`
+   (`scripts/build_package.py`), and publishes the release on Gitea with the zip and notes: install steps, then that
+   version's changelog section (`scripts/publish_gitea_release.py`). A version with a suffix (`-beta`) is published
+   as a pre-release. If any check fails, nothing is published. Running it again for the same version updates the
+   release and replaces its zip.
+
+5. Gitea's push mirror then sends the commits and the new tag to GitHub, where the tag starts GitHub's own
+   **Release** workflow (`.github/workflows/release.yml`), which runs the same checks and publishes the same
+   release there. The Marketplace picks it up from GitHub. If GitHub is down, the mirror catches up later; the Gitea
+   release is already done.
+
+The Gitea workflows use no actions (`actions/checkout` and the like download from GitHub): each job runs in a plain
+image from Docker Hub (`python:3.14-bookworm`) and fetches the code from Gitea with git, so testing and releasing
+keep working when GitHub can't be reached. The tests' packages still come from PyPI. When the runner's jobs can't
+reach Gitea at its public address (a runner on the same Docker network as Gitea, say), set an Actions variable
+`GITEA_INTERNAL_URL` to the address they can reach (`http://gitea-server:3000`); both workflows and the publish
+script use it.
+
+Keep every tag on Gitea: the push mirror makes GitHub's tags match Gitea's, so a tag missing from Gitea is deleted on
+GitHub, and the GitHub release on it turns into a draft.
 
 ## Reporting bugs
 

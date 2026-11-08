@@ -44,3 +44,6 @@ jobs:
       - run: python tests/test_integration.py
       # every scenario x two seeds, 3 years each (the full check is 30 years: see CONTRIBUTING.md)
       - run: python tests/test_energy_soak.py 3 2
+      - run: python tests/test_release.py
+      - name: Build carrier_infinity.zip, and check it installs
+        run: python scripts/build_package.py
