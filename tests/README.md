@@ -14,7 +14,7 @@ python3 tests/test_release.py
 |---|---|
 | `test_energy_soak.py` | Long-run simulation of the lifetime electricity meter (sensor.py), against a model of Carrier's cloud |
 | `test_integration.py` | Integration test: the whole Home Assistant side (coordinator, climate, sensors, config flow, log filter) against Home Assistant stand-ins (stubs.py) and recorded Carrier data (tests/fixtures) |
-| `test_release.py` | The release scripts in `scripts/`: the version check and notes, building and checking the zip, and publishing to a fake Gitea server |
+| `test_release.py` | The release scripts in `scripts/`: the version check and notes, building and checking the zip, publishing to a fake Gitea server, and working out which releases GitHub still needs |
 
 [CONTRIBUTING.md](../CONTRIBUTING.md#checking-a-change) says which to run for which change, and how long each takes.
 The tests stand in for Home Assistant (`stubs.py`), so they can't prove the integration works on a real Home
