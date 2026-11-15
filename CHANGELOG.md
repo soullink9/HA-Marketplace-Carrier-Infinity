@@ -2,6 +2,13 @@
 
 ## Unreleased
 
+### Integration
+
+- Uses carrier-api 3.8.0 (was 3.6.2). Signing in again after a session expires now goes through Carrier's own
+  service, so it works for accounts that sign in with Microsoft as well as Okta, and parallel requests no longer
+  refresh the same token twice. Changes to a zone's activities pushed over the live connection now update the right
+  activity (3.6.2 could merge them into the wrong one). Nothing changes in how the integration is set up or used.
+
 ### Repository
 
 - Gitea is the main copy: its runner checks every push and publishes releases (`.gitea/workflows/`), with nothing
