@@ -30,11 +30,11 @@ has no local option that works without extra hardware or modified firmware; the
 
 ## Install
 
-**Needs:** Home Assistant 2026.9 or newer, and a Carrier account that works in the Carrier app (the same username and
+**Needs:** Home Assistant 2026.11 or newer, and a Carrier account that works in the Carrier app (the same username and
 password). Built and tested with an Infinity Touch (SYSTXCCITC01-C); other thermostats that work in the Carrier app
 should work too.
 
-1. **Download.** Install **Carrier Infinity (Cloud)** from the Marketplace (**Settings → Marketplace**, Home Assistant 2026.11 and newer), or copy the [`custom_components/carrier_infinity`](custom_components/carrier_infinity) folder into `/config/custom_components/` and restart Home Assistant.
+1. **Download.** Install **Carrier Infinity (Cloud)** from the Marketplace (**Settings → Marketplace**), or copy the [`custom_components/carrier_infinity`](custom_components/carrier_infinity) folder into `/config/custom_components/` and restart Home Assistant.
 2. **Sign in.** Press the button above, or go to **Settings → Devices & services → Add integration → Carrier
    Infinity (Cloud)**, and enter your Carrier app username and password.
 3. **Use it.** Each thermostat appears as a device with a thermostat entity per zone, an outdoor temperature sensor

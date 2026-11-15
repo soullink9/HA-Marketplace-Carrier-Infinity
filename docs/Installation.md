@@ -1,12 +1,12 @@
 # Installation
 
-**Needs:** Home Assistant 2026.9 or newer, internet access, and a Carrier account that works in the Carrier app (the
+**Needs:** Home Assistant 2026.11 or newer, internet access, and a Carrier account that works in the Carrier app (the
 same username and password). Built and tested with an Infinity Touch (SYSTXCCITC01-C); other thermostats that work in
 the Carrier app should work too.
 
 ## From the Marketplace
 
-In Home Assistant 2026.11 and newer, open **Settings → Marketplace**, search for **Carrier Infinity (Cloud)** and install it, then
+Open **Settings → Marketplace**, search for **Carrier Infinity (Cloud)** and install it, then
 restart Home Assistant. Updates then show up under **Settings → Updates**.
 
 If it isn't listed yet, add it from its link instead: this repository's address,

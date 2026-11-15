@@ -64,7 +64,7 @@ data flows from Carrier to the entities.
 
 ## Checking a change
 
-You need Python 3.14 (what Home Assistant 2026.9 uses). Then:
+You need Python 3.14 (what Home Assistant 2026.11 uses). Then:
 
 ```sh
 pip install -r tests/requirements.txt
@@ -84,7 +84,7 @@ readings, and Carrier's quirks (a late New Year, a stale or missing "last year" 
 with `N/N runs within bounds`; each run must finish within a few kWh of Carrier's own figures, allowing only for
 data that no meter could have seen.
 
-The tests use stand-ins for Home Assistant (`tests/stubs.py`), written to match Home Assistant 2026.9. If Home
+The tests use stand-ins for Home Assistant (`tests/stubs.py`), written to match Home Assistant 2026.11. If Home
 Assistant changes an API the integration uses, update the stand-in to match. Gitea's runner checks every push
 (`.gitea/workflows/test.yml`: the lint, the tests, a 3-year simulation, building the zip); on GitHub, the same
 checks run plus Home Assistant's `hassfest` and the Marketplace's own checks, which come from GitHub and can only run
@@ -146,7 +146,8 @@ exits non-zero if any check fails.
 ### The Marketplace
 
 `hacs.json` at the root is the Marketplace's file: the name it lists and the oldest Home Assistant version the
-integration works with. Keep that version in step with the README's requirements.
+integration works with. It tracks the latest Home Assistant release only (currently 2026.11.0): when a change needs
+a newer release, raise it here and in the README and docs/Installation.md, and drop any code kept for older versions.
 
 ## Commits
 
