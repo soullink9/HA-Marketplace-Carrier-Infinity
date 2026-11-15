@@ -1,5 +1,27 @@
 # Changelog
 
+## 1.3.0 (2026-11-15)
+
+Built for Home Assistant 2026.11 only.
+
+### Integration
+
+- **Needs Home Assistant 2026.11 or newer.** The Marketplace won't offer this release to older versions; stay on
+  1.2.1 until you update Home Assistant.
+- The thermostats use Home Assistant 2026.11's new temperature names (`native_temperature_unit`,
+  `native_current_temperature`, `native_target_temperature` and its low/high pair). On 2026.11, 1.2.1 logged a
+  deprecation warning for each of them at every start, and the old names stop working in 2027.11. Nothing changes
+  in what the thermostats show or do: Home Assistant still converts to your units as before.
+- Setting up and unloading follow Home Assistant 2026.11's pattern: they return nothing and raise on failure, so
+  if the entities ever fail to unload, Home Assistant says why instead of only marking the entry as failed.
+
+### Repository
+
+- `hacs.json` asks for Home Assistant 2026.11.0, and the README and installation guide say so.
+- The test stand-ins match Home Assistant 2026.11, and fail if the thermostat goes back to a deprecated name.
+- Ruff targets Python 3.14 (what Home Assistant 2026.11 runs on), so it formats for 3.14's syntax.
+- CONTRIBUTING.md: the integration tracks the latest Home Assistant release only, with no code kept for older ones.
+
 ## 1.2.1 (2026-11-15)
 
 ### Integration
