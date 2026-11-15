@@ -2,7 +2,7 @@
 
 Not a substitute for real Home Assistant: it checks our code paths (the coordinator, entities, websocket handling,
 the electricity meter, the config flow) against small fakes of the Home Assistant APIs we use, written to match
-Home Assistant 2026.9. If Home Assistant changes one of those APIs, update the fake here to match.
+Home Assistant 2026.11. If Home Assistant changes one of those APIs, update the fake here to match.
 
 It also replaces the network layer under carrier_api (aiohttp, gql), so nothing can reach Carrier's cloud.
 Needs carrier-api installed (pip install -r tests/requirements.txt).
@@ -184,7 +184,16 @@ class Entity:
     pass
 
 
-class ClimateEntity(Entity): ...
+class ClimateEntity(Entity):
+    # Renamed in Home Assistant 2026.11 (the old names log a warning, and stop working in 2027.11).
+    DEPRECATED = ("temperature_unit", "current_temperature", "target_temperature", "target_temperature_high",
+                  "target_temperature_low")  # fmt: skip
+
+    def __init_subclass__(cls, **kw):
+        super().__init_subclass__(**kw)
+        for name in cls.DEPRECATED:
+            if any(name in vars(c) or f"_attr_{name}" in vars(c) for c in cls.__mro__ if c is not ClimateEntity):
+                raise TypeError(f"{cls.__name__} uses {name}, deprecated in Home Assistant 2026.11: use native_{name}")
 
 
 class SensorEntity(Entity): ...

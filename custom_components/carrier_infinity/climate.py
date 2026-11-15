@@ -138,7 +138,7 @@ class CarrierZone(CarrierEntity, ClimateEntity):
     # --- state shown in Home Assistant -------------------------------------------------------------
 
     @property
-    def temperature_unit(self) -> str:
+    def native_temperature_unit(self) -> str:
         """The unit the thermostat is set to display; Home Assistant converts if yours differs."""
         if self._system.status.temperature_unit == TemperatureUnits.CELSIUS:
             return UnitOfTemperature.CELSIUS
@@ -147,10 +147,10 @@ class CarrierZone(CarrierEntity, ClimateEntity):
     @property
     def target_temperature_step(self) -> float:
         """Carrier accepts whole degrees Fahrenheit, or half degrees Celsius."""
-        return 0.5 if self.temperature_unit == UnitOfTemperature.CELSIUS else 1.0
+        return 0.5 if self.native_temperature_unit == UnitOfTemperature.CELSIUS else 1.0
 
     @property
-    def current_temperature(self) -> float | None:
+    def native_current_temperature(self) -> float | None:
         """Room temperature measured by the zone's sensor."""
         return self._status_zone.temperature
 
@@ -164,7 +164,7 @@ class CarrierZone(CarrierEntity, ClimateEntity):
         """The system mode (shared by all zones); None if Carrier reports one we don't know."""
         try:
             actual = MODES[SystemModes(self._system.config.mode)]
-        except (KeyError, ValueError):
+        except KeyError, ValueError:
             actual = None
         return self._shown("mode", actual, zone=False)
 
@@ -191,7 +191,7 @@ class CarrierZone(CarrierEntity, ClimateEntity):
         return self._shown("cool", self._activity.cool_set_point)
 
     @property
-    def target_temperature(self) -> float | None:
+    def native_target_temperature(self) -> float | None:
         """Single target in heat or cool mode (heat_cool uses the low/high pair below)."""
         if self.hvac_mode == HVACMode.HEAT:
             return self._heat
@@ -200,12 +200,12 @@ class CarrierZone(CarrierEntity, ClimateEntity):
         return None
 
     @property
-    def target_temperature_low(self) -> float | None:
+    def native_target_temperature_low(self) -> float | None:
         """Heat setpoint, in heat_cool (auto) mode."""
         return self._heat if self.hvac_mode == HVACMode.HEAT_COOL else None
 
     @property
-    def target_temperature_high(self) -> float | None:
+    def native_target_temperature_high(self) -> float | None:
         """Cool setpoint, in heat_cool (auto) mode."""
         return self._cool if self.hvac_mode == HVACMode.HEAT_COOL else None
 
@@ -285,7 +285,8 @@ class CarrierZone(CarrierEntity, ClimateEntity):
     async def async_set_temperature(self, **kwargs: Any) -> None:
         """Write the setpoints to the zone's manual activity and hold it indefinitely, like the wall unit.
 
-        Carrier always stores both setpoints, so the one not being changed keeps its current value.
+        Carrier always stores both setpoints, so the one not being changed keeps its current value. Home Assistant
+        has already converted the values to the thermostat's own unit (native_temperature_unit).
         """
         manual = self._config_zone.find_activity(ActivityTypes.MANUAL)
         if manual is None:

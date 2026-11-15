@@ -22,8 +22,11 @@ from .const import PLATFORMS
 from .coordinator import CarrierConfigEntry, CarrierCoordinator
 
 
-async def async_setup_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> bool:
-    """Set up one Carrier account: sign in, load the systems, start the websocket, add the entities."""
+async def async_setup_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> None:
+    """Set up one Carrier account: sign in, load the systems, start the websocket, add the entities.
+
+    Returns nothing: a failure raises instead (ConfigEntryAuthFailed or ConfigEntryNotReady, from the first refresh).
+    """
     coordinator = CarrierCoordinator(hass, entry)
     entry.async_on_unload(coordinator.api.cleanup)  # close the cloud session on unload (or failed setup)
     await coordinator.async_config_entry_first_refresh()
@@ -31,9 +34,11 @@ async def async_setup_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> b
     # A background task tied to the entry: Home Assistant cancels it when the entry unloads.
     entry.async_create_background_task(hass, coordinator.websocket_loop(), "carrier_websocket")
     await hass.config_entries.async_forward_entry_setups(entry, PLATFORMS)
-    return True
 
 
-async def async_unload_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> bool:
-    """Unload the entities; the websocket task and cloud session are closed by the hooks above."""
-    return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
+async def async_unload_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> None:
+    """Unload the entities; the websocket task and cloud session are closed by the hooks above.
+
+    If a platform fails to unload, Home Assistant raises a ConfigEntryError that tells the user why.
+    """
+    await hass.config_entries.async_unload_platforms_or_raise(entry, PLATFORMS)

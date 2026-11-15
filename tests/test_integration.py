@@ -135,12 +135,26 @@ async def test_climate():
     check("device info from the profile", z._attr_device_info["model"] == "SYSTXCCWIC01-B", z._attr_device_info)
     check(
         "state from the fixture",
-        (z.hvac_mode, z.current_temperature, z.current_humidity, z.preset_mode, z.target_temperature, z.fan_mode)
+        (
+            z.hvac_mode,
+            z.native_current_temperature,
+            z.current_humidity,
+            z.preset_mode,
+            z.native_target_temperature,
+            z.fan_mode,
+        )
         == (HVACMode.HEAT, 74.0, 32, "wake", 74.0, "medium"),
-        (z.hvac_mode, z.current_temperature, z.current_humidity, z.preset_mode, z.target_temperature, z.fan_mode),
+        (
+            z.hvac_mode,
+            z.native_current_temperature,
+            z.current_humidity,
+            z.preset_mode,
+            z.native_target_temperature,
+            z.fan_mode,
+        ),
     )
     check("heating while the zone is actively heating", z.hvac_action == HVACAction.HEATING, z.hvac_action)
-    check("whole degrees in Fahrenheit", (z.temperature_unit, z.target_temperature_step) == ("°F", 1.0))
+    check("whole degrees in Fahrenheit", (z.native_temperature_unit, z.target_temperature_step) == ("°F", 1.0))
 
     await z.async_set_hvac_mode(HVACMode.COOL)
     await z.async_set_temperature(temperature=71.0)
@@ -152,12 +166,14 @@ async def test_climate():
     check("set cool 71: the heat setpoint is kept", c.api.calls[1][1][2:4] == ["74.0", "71.0"], c.api.calls[1])
     check(
         "set cool 71: shown straight away",
-        (z.hvac_mode, z.target_temperature, z.preset_mode) == (HVACMode.COOL, 71.0, "manual"),
+        (z.hvac_mode, z.native_target_temperature, z.preset_mode) == (HVACMode.COOL, 71.0, "manual"),
     )
 
     c.data = await c._async_update_data()  # the cloud still serves the pre-change values for a while
     await c._on_message(message("status_zone_htsp", serial))
-    check("stale cloud data does not undo the change", (z.hvac_mode, z.target_temperature) == (HVACMode.COOL, 71.0))
+    check(
+        "stale cloud data does not undo the change", (z.hvac_mode, z.native_target_temperature) == (HVACMode.COOL, 71.0)
+    )
 
     await z.async_set_temperature(target_temp_low=66.0, target_temp_high=77.0)
     check("range in heat_cool form: both setpoints sent", c.api.calls[-2][1][2:4] == ["66.0", "77.0"], c.api.calls[-2])
@@ -166,7 +182,8 @@ async def test_climate():
     away = c.data[serial].config.zones[0].find_activity(ActivityTypes.AWAY)
     check(
         "preset away: hold sent and away's setpoints shown",
-        c.api.calls[-1] == ("set_config_hold", [serial, "1", "away"]) and z.target_temperature == away.cool_set_point,
+        c.api.calls[-1] == ("set_config_hold", [serial, "1", "away"])
+        and z.native_target_temperature == away.cool_set_point,
     )
 
     await z.async_set_fan_mode("high")
