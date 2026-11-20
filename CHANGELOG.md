@@ -1,5 +1,15 @@
 # Changelog
 
+## 1.3.1 (2026-11-19)
+
+### Integration
+
+- A one-off failure to reach Carrier's cloud no longer logs an error or makes the thermostats unavailable. When the
+  5-minute refresh can't connect (for example "Carrier connection failed during GraphQL operation:
+  getInfinitySystems"), it waits 10 seconds and asks once more before giving up.
+- If Carrier is still unreachable, the entities go unavailable as before, but the next try comes after 1 minute
+  instead of 5, so they come back soon after Carrier does.
+
 ## 1.3.0 (2026-11-15)
 
 Built for Home Assistant 2026.11 only.
