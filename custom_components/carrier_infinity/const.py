@@ -17,6 +17,12 @@ FULL_REFRESH = timedelta(minutes=5)
 # value for a few minutes. For this long, the value we wrote is shown instead of the cloud's stale copy.
 EXPECT_SECONDS = 300
 
+# When a full refresh can't reach Carrier's cloud (a dropped connection, a timeout, a 5xx), try once more
+# after RETRY_PAUSE seconds, so a one-off blip is never noticed. If that fails too, the entities go
+# unavailable and the next attempt comes RETRY_AFTER seconds later instead of a whole FULL_REFRESH.
+RETRY_PAUSE = 10
+RETRY_AFTER = 60
+
 # Websocket reconnect back-off: start here, double on each failure, never wait longer than the cap.
 RECONNECT_FIRST = 10
 RECONNECT_MAX = 600

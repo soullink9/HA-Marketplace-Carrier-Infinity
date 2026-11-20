@@ -16,14 +16,21 @@ import logging
 from time import monotonic
 from typing import Any
 
-from carrier_api import ApiConnectionGraphql, CarrierApiAuthError, CarrierApiError, System, WebsocketDataUpdater
+from carrier_api import (
+    ApiConnectionGraphql,
+    CarrierApiAuthError,
+    CarrierApiConnectionError,
+    CarrierApiError,
+    System,
+    WebsocketDataUpdater,
+)
 from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
-from .const import DOMAIN, EXPECT_SECONDS, FULL_REFRESH, RECONNECT_FIRST, RECONNECT_MAX
+from .const import DOMAIN, EXPECT_SECONDS, FULL_REFRESH, RECONNECT_FIRST, RECONNECT_MAX, RETRY_AFTER, RETRY_PAUSE
 
 _LOGGER = logging.getLogger(__name__)
 
@@ -76,23 +83,38 @@ class CarrierCoordinator(DataUpdateCoordinator[dict[str, System]]):
     # --- full refresh ------------------------------------------------------------------------------
 
     async def _async_update_data(self) -> dict[str, System]:
-        """Load everything from Carrier, signing in again (once) if the saved session has expired."""
+        """Load everything from Carrier, riding out one connection blip and one expired session."""
         try:
-            if self.api.refresh_token is not None:
-                try:
-                    return await self._fetch()
-                except CarrierApiAuthError:
-                    # The saved session expired or was revoked: sign in again with the password, once.
-                    self.api.refresh_token = None
-            return await self._fetch()
+            try:
+                return await self._load()
+            except (CarrierApiConnectionError, TimeoutError) as err:
+                # Carrier's cloud drops the odd request (a reset connection, a timeout, a 5xx). The
+                # query only reads, so wait a moment and ask once more before telling anyone.
+                _LOGGER.debug("Carrier connection failed, trying again in %s s: %s", RETRY_PAUSE, err)
+                await asyncio.sleep(RETRY_PAUSE)
+                return await self._load()
         except CarrierApiAuthError as err:
             # The password itself is wrong now. Stop here (repeated sign-ins could lock the Carrier
             # account) and let Home Assistant ask for the new password (config_flow reauth step).
             raise ConfigEntryAuthFailed("Carrier rejected the saved password") from err
-        except (CarrierApiError, TimeoutError, KeyError, ValueError) as err:
+        except (CarrierApiConnectionError, TimeoutError) as err:
+            # Still unreachable: entities go unavailable, and the next try comes in RETRY_AFTER seconds
+            # rather than a whole FULL_REFRESH, so they are back soon after Carrier is.
+            raise UpdateFailed(f"Carrier cloud error: {err}", retry_after=RETRY_AFTER) from err
+        except (CarrierApiError, KeyError, ValueError) as err:
             # KeyError/ValueError: Carrier sent data carrier_api could not parse (for example a new
             # preset name). Entities go unavailable until a later refresh parses again.
             raise UpdateFailed(f"Carrier cloud error: {err}") from err
+
+    async def _load(self) -> dict[str, System]:
+        """One full load, signing in again with the password (once) if the saved session has expired."""
+        if self.api.refresh_token is not None:
+            try:
+                return await self._fetch()
+            except CarrierApiAuthError:
+                # The saved session expired or was revoked: sign in again with the password, once.
+                self.api.refresh_token = None
+        return await self._fetch()
 
     async def _fetch(self) -> dict[str, System]:
         """One full load of every system (signs in first if needed; carrier_api handles that)."""

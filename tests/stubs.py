@@ -135,7 +135,10 @@ class HomeAssistantError(Exception): ...
 class ConfigEntryAuthFailed(HomeAssistantError): ...
 
 
-class UpdateFailed(HomeAssistantError): ...
+class UpdateFailed(HomeAssistantError):
+    def __init__(self, *args, retry_after=None, **kwargs):
+        super().__init__(*args)
+        self.retry_after = retry_after
 
 
 class AbortFlow(Exception):

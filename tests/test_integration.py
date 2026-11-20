@@ -21,7 +21,13 @@ import stubs  # noqa: I001 - must come first: it installs the Home Assistant sta
 from stubs import NOW, REPO, SAVED, TZ, ConfigEntry, ConfigEntryAuthFailed, HVACAction, HVACMode
 from stubs import HomeAssistantError, UpdateFailed, load_systems, message
 
-from carrier_api import ActivityTypes, CarrierApiAuthError, CarrierApiGraphqlError, EnergyPeriod
+from carrier_api import (
+    ActivityTypes,
+    CarrierApiAuthError,
+    CarrierApiConnectionError,
+    CarrierApiGraphqlError,
+    EnergyPeriod,
+)
 
 import carrier_infinity  # noqa: F401 - the integration's own modules load cleanly
 from carrier_infinity import climate, config_flow, coordinator as coord_mod, sensor
@@ -98,6 +104,19 @@ async def test_coordinator():
         check("cloud error: entities go unavailable until the next refresh", False, "no error")
     except UpdateFailed:
         check("cloud error: entities go unavailable until the next refresh", True)
+
+    coord_mod.RETRY_PAUSE = 0  # the real pause is 10 seconds
+    blip = "Carrier connection failed during GraphQL operation: getInfinitySystems"
+    c.api.fail_with = [CarrierApiConnectionError(blip)]
+    data = await c._async_update_data()
+    check("connection blip: tries once more and carries on", serial in data and not c.api.fail_with)
+
+    c.api.fail_with = [CarrierApiConnectionError(blip), TimeoutError()]
+    try:
+        await c._async_update_data()
+        check("cloud unreachable: unavailable, tries again in a minute", False, "no error")
+    except UpdateFailed as err:
+        check("cloud unreachable: unavailable, tries again in a minute", err.retry_after == 60, err.retry_after)
 
     c.data = await c._async_update_data()
     before = c.listener_updates
