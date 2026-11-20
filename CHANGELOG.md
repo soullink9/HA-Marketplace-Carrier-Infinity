@@ -1,5 +1,22 @@
 # Changelog
 
+## 1.4.0 (2026-11-20)
+
+### Integration
+
+- Uses carrier-api 3.12.0 (was 3.8.0). When Carrier rejects a request's token before it was due to expire, the
+  library now refreshes it and tries the request again by itself, and signs in again with the saved password if the
+  refresh is rejected too. A websocket message for a thermostat that isn't on the account is skipped quietly.
+- Talks to Carrier's cloud through Home Assistant's shared web session instead of opening one of its own, as Home
+  Assistant recommends for integrations. The sign-in check in the setup and password forms does the same.
+
+### Repository
+
+- GitHub workflows use actions/checkout v7 and actions/setup-python v7 (were v5 and v6). Nothing else changes in
+  what they run.
+- New tests: the coordinator and the sign-in forms pass Home Assistant's shared session to carrier-api, and a
+  websocket message for another system leaves the data alone.
+
 ## 1.3.1 (2026-11-19)
 
 ### Integration
