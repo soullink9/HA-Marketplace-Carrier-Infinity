@@ -28,7 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> N
     Returns nothing: a failure raises instead (ConfigEntryAuthFailed or ConfigEntryNotReady, from the first refresh).
     """
     coordinator = CarrierCoordinator(hass, entry)
-    entry.async_on_unload(coordinator.api.cleanup)  # close the cloud session on unload (or failed setup)
+    entry.async_on_unload(coordinator.api.cleanup)  # stop the websocket on unload (or failed setup)
     await coordinator.async_config_entry_first_refresh()
     entry.runtime_data = coordinator
     # A background task tied to the entry: Home Assistant cancels it when the entry unloads.

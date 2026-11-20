@@ -34,7 +34,7 @@ jobs:
     outputs:
       releases: ${{ steps.plan.outputs.releases }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0 # every tag, to compare with GitHub's releases
 
@@ -57,12 +57,12 @@ jobs:
       matrix:
         include: ${{ fromJSON(needs.plan.outputs.releases) }}
     steps:
-      - uses: actions/checkout@v5
+      - uses: actions/checkout@v7
         with:
           ref: ${{ matrix.tag }} # the release is built from its tag, as on Gitea
 
       # Home Assistant 2026.11 runs on Python 3.14 and supports nothing older
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.14"
 

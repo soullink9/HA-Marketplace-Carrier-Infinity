@@ -226,6 +226,7 @@ class ConfigFlow:
         cls.domain = domain
 
     def __init__(self):
+        self.hass = object()
         self.unique_id = None
         self.reauth_entry = None
 
@@ -274,6 +275,8 @@ mod("homeassistant.config_entries", ConfigEntry=ConfigEntry, ConfigFlow=ConfigFl
 mod("homeassistant.exceptions", HomeAssistantError=HomeAssistantError, ConfigEntryAuthFailed=ConfigEntryAuthFailed)
 mod("homeassistant.helpers")
 mod("homeassistant.helpers.device_registry", DeviceInfo=dict)
+SHARED_SESSION = MagicMock(name="Home Assistant's shared aiohttp session")
+mod("homeassistant.helpers.aiohttp_client", async_get_clientsession=lambda hass: SHARED_SESSION)
 mod("homeassistant.helpers.entity_platform", AddConfigEntryEntitiesCallback=object)
 mod(
     "homeassistant.helpers.update_coordinator",

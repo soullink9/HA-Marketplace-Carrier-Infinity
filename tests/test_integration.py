@@ -82,6 +82,8 @@ async def new_coordinator():
 async def test_coordinator():
     """Full refresh, the one-time silent sign-in retry, wrong passwords, cloud errors and websocket messages."""
     print("coordinator")
+    real = coord_mod.CarrierCoordinator(object(), ConfigEntry({"username": "me@example.com", "password": "pw"}))
+    check("the cloud connection uses Home Assistant's shared web session", real.api.api_session is stubs.SHARED_SESSION)
     c = await new_coordinator()
     serial = next(iter(c.data))
     check("loads every system, keyed by serial", list(c.data) == ["SERIALXXX"], list(c.data))
@@ -125,9 +127,10 @@ async def test_coordinator():
     check(
         "websocket message updates the data and the entities", zone.humidity == 34 and c.listener_updates == before + 1
     )
-    for bad in ("not json", '{"messageType":"InfinityStatus","deviceId":"OTHER"}'):
-        await c._on_message(bad)
-    check("bad or unknown websocket messages are ignored", c.listener_updates == before + 1)
+    await c._on_message("not json")
+    check("a broken websocket message is ignored", c.listener_updates == before + 1)
+    await c._on_message('{"messageType":"InfinityStatus","deviceId":"OTHER","zones":[{"id":"1","rh":99}]}')
+    check("a message for another system changes nothing", c.data[serial].status.zones[0].humidity == 34)
     await c._on_message(message("heartbeat_with_no_device_id", serial))
     check("keep-alive messages change nothing", c.data[serial].status.zones[0].humidity == 34)
 
@@ -308,8 +311,8 @@ async def test_config_flow():
 
         outcome = None
 
-        def __init__(self, username, password):
-            self.password = password
+        def __init__(self, username, password, client_session=None):
+            self.password, FakeLogin.session = password, client_session
 
         async def login(self):
             if FakeLogin.outcome:
@@ -323,6 +326,7 @@ async def test_config_flow():
     flow = config_flow.CarrierConfigFlow()
     result = await flow.async_step_user(user)
     check("good sign-in creates the entry", result["type"] == "create_entry" and flow.unique_id == "me@example.com")
+    check("the sign-in check uses Home Assistant's shared web session", FakeLogin.session is stubs.SHARED_SESSION)
     for error, expected in (
         (CarrierApiAuthError("x"), "invalid_auth"),
         (CarrierApiGraphqlError("x"), "cannot_connect"),

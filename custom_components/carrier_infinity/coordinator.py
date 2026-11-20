@@ -28,6 +28,7 @@ from homeassistant.config_entries import ConfigEntry
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
 from homeassistant.core import HomeAssistant
 from homeassistant.exceptions import ConfigEntryAuthFailed
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.update_coordinator import DataUpdateCoordinator, UpdateFailed
 
 from .const import DOMAIN, EXPECT_SECONDS, FULL_REFRESH, RECONNECT_FIRST, RECONNECT_MAX, RETRY_AFTER, RETRY_PAUSE
@@ -60,7 +61,11 @@ class CarrierCoordinator(DataUpdateCoordinator[dict[str, System]]):
     def __init__(self, hass: HomeAssistant, entry: CarrierConfigEntry) -> None:
         """Create the cloud connection for this account (nothing is sent until the first refresh)."""
         super().__init__(hass, _LOGGER, config_entry=entry, name=DOMAIN, update_interval=FULL_REFRESH)
-        self.api = ApiConnectionGraphql(entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD])
+        # Home Assistant's shared web session: carrier_api's requests and websocket use its connection pool, and
+        # api.cleanup() leaves it open (Home Assistant closes it at shutdown).
+        self.api = ApiConnectionGraphql(
+            entry.data[CONF_USERNAME], entry.data[CONF_PASSWORD], client_session=async_get_clientsession(hass)
+        )
         # Applies websocket messages to the System objects; given the systems after each full load.
         self.updater = WebsocketDataUpdater([])
         # (serial, zone id or None, field) -> (value we wrote, monotonic time it stops overriding).

@@ -11,6 +11,8 @@ from typing import Any
 from carrier_api import ApiConnectionGraphql, CarrierApiAuthError, CarrierApiError
 from homeassistant.config_entries import ConfigFlow, ConfigFlowResult
 from homeassistant.const import CONF_PASSWORD, CONF_USERNAME
+from homeassistant.core import HomeAssistant
+from homeassistant.helpers.aiohttp_client import async_get_clientsession
 from homeassistant.helpers.selector import TextSelector, TextSelectorConfig, TextSelectorType
 import voluptuous as vol
 
@@ -21,9 +23,9 @@ SCHEMA = vol.Schema({vol.Required(CONF_USERNAME): str, vol.Required(CONF_PASSWOR
 REAUTH_SCHEMA = vol.Schema({vol.Required(CONF_PASSWORD): PASSWORD})
 
 
-async def _check_login(username: str, password: str) -> dict[str, str]:
+async def _check_login(hass: HomeAssistant, username: str, password: str) -> dict[str, str]:
     """Try to sign in to Carrier. Returns the form errors: none if it worked (labels in translations/en.json)."""
-    api = ApiConnectionGraphql(username, password)
+    api = ApiConnectionGraphql(username, password, client_session=async_get_clientsession(hass))
     try:
         await api.login()
     except CarrierApiAuthError:
@@ -31,7 +33,7 @@ async def _check_login(username: str, password: str) -> dict[str, str]:
     except CarrierApiError:
         return {"base": "cannot_connect"}
     finally:
-        await api.cleanup()  # this was only a test sign-in: close its connection
+        await api.cleanup()  # this was only a test sign-in (the shared session itself stays open)
     return {}
 
 
@@ -47,7 +49,7 @@ class CarrierConfigFlow(ConfigFlow, domain=DOMAIN):
             # The username (case-insensitive) identifies the account, so it can only be added once.
             await self.async_set_unique_id(user_input[CONF_USERNAME].lower())
             self._abort_if_unique_id_configured()
-            errors = await _check_login(user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
+            errors = await _check_login(self.hass, user_input[CONF_USERNAME], user_input[CONF_PASSWORD])
             if not errors:
                 return self.async_create_entry(title=user_input[CONF_USERNAME], data=user_input)
         return self.async_show_form(step_id="user", data_schema=SCHEMA, errors=errors)
@@ -61,7 +63,7 @@ class CarrierConfigFlow(ConfigFlow, domain=DOMAIN):
         entry = self._get_reauth_entry()
         errors: dict[str, str] = {}
         if user_input is not None:
-            errors = await _check_login(entry.data[CONF_USERNAME], user_input[CONF_PASSWORD])
+            errors = await _check_login(self.hass, entry.data[CONF_USERNAME], user_input[CONF_PASSWORD])
             if not errors:
                 return self.async_update_reload_and_abort(
                     entry, data_updates={CONF_PASSWORD: user_input[CONF_PASSWORD]}

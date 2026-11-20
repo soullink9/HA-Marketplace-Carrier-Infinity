@@ -1,4 +1,4 @@
 # What the tests need beyond Python 3.14 itself. carrier-api must match the version in manifest.json;
 # Home Assistant itself is not needed (tests/stubs.py stands in for it).
-carrier-api==3.8.0
+carrier-api==3.12.0
 ruff
