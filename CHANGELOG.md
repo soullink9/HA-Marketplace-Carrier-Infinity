@@ -1,5 +1,30 @@
 # Changelog
 
+## 1.4.1 (2026-11-22)
+
+Fixes from a security review.
+
+### Integration
+
+- Passwords and tokens are now blanked out of log lines (shown as `**REDACTED**`) instead of the whole line being
+  dropped, so debug logs keep the rest of what Carrier sent. This covers the gql and carrier_api loggers and the
+  integration's own, including a token in the websocket's address or in an error's traceback.
+- A websocket message the integration can't read is logged by its type and size, no longer with its whole body.
+- New **Download diagnostics** on the integration's page: the config entry and everything Carrier reports for each
+  system, with the username, password and tokens redacted. Attach it to bug reports.
+- If a change only partly goes through (for example Carrier accepts the new setpoints but refuses the hold), the
+  integration now reloads from Carrier straight away, so the thermostat shows what the zone really has.
+- Reloading the integration no longer risks adding the log filter a second time.
+
+### Repository
+
+- GitHub workflows pin every action to a commit (actions/checkout v7.0.1, actions/setup-python v7.1.0, hassfest
+  2026.11.0, and the HACS action's current main), and each job gets only the permissions it needs: read-only
+  everywhere except the job that publishes GitHub releases. Checkouts no longer keep the job's token.
+- Gitea releases: a re-run uploads the new file before removing the old one, so a failed upload leaves the release
+  with its previous file instead of none.
+- New tests for all of the above.
+
 ## 1.4.0 (2026-11-20)
 
 ### Integration
