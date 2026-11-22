@@ -5,7 +5,8 @@ creates one climate entity per zone, plus outdoor temperature and lifetime elect
 
 File map:
 - const.py        shared constants (domain, timings)
-- coordinator.py  the cloud connection, the 5-minute refresh and the websocket
+- coordinator.py  the cloud connection, the 5-minute refresh, the websocket and the log redaction
+- diagnostics.py  the "Download diagnostics" file, with the account and its secrets redacted
 - entity.py       the base class (one device per Carrier system)
 - climate.py      the zone thermostats
 - sensor.py       outdoor temperature and the lifetime electricity meter
@@ -19,7 +20,7 @@ from __future__ import annotations
 from homeassistant.core import HomeAssistant
 
 from .const import PLATFORMS
-from .coordinator import CarrierConfigEntry, CarrierCoordinator
+from .coordinator import CarrierConfigEntry, CarrierCoordinator, install_log_redaction
 
 
 async def async_setup_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> None:
@@ -27,6 +28,7 @@ async def async_setup_entry(hass: HomeAssistant, entry: CarrierConfigEntry) -> N
 
     Returns nothing: a failure raises instead (ConfigEntryAuthFailed or ConfigEntryNotReady, from the first refresh).
     """
+    install_log_redaction()  # once per logger, however often the entry is reloaded
     coordinator = CarrierCoordinator(hass, entry)
     entry.async_on_unload(coordinator.api.cleanup)  # stop the websocket on unload (or failed setup)
     await coordinator.async_config_entry_first_refresh()

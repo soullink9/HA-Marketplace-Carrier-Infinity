@@ -150,7 +150,12 @@ class AbortFlow(Exception):
 class ConfigEntry(Generic):
     def __init__(self, data, unique_id=None):
         self.data, self.unique_id = dict(data), unique_id
+        self.title = data.get("username")
         self.reloaded = 0
+        self.runtime_data = None
+
+    def as_dict(self):
+        return {"domain": "carrier_infinity", "title": self.title, "data": dict(self.data), "unique_id": self.unique_id}
 
 
 class DataUpdateCoordinator(Generic):
@@ -162,6 +167,9 @@ class DataUpdateCoordinator(Generic):
 
     def async_update_listeners(self):
         self.listener_updates += 1
+
+    async def async_request_refresh(self):
+        self.refresh_requests = getattr(self, "refresh_requests", 0) + 1
 
 
 class CoordinatorEntity(Generic):
@@ -277,6 +285,19 @@ mod("homeassistant.helpers")
 mod("homeassistant.helpers.device_registry", DeviceInfo=dict)
 SHARED_SESSION = MagicMock(name="Home Assistant's shared aiohttp session")
 mod("homeassistant.helpers.aiohttp_client", async_get_clientsession=lambda hass: SHARED_SESSION)
+REDACTED = "**REDACTED**"
+
+
+def async_redact_data(data, to_redact):
+    """Like Home Assistant's: the value of each key in to_redact becomes REDACTED, at any depth."""
+    if isinstance(data, list):
+        return [async_redact_data(item, to_redact) for item in data]
+    if not isinstance(data, dict):
+        return data
+    return {k: REDACTED if k in to_redact else async_redact_data(v, to_redact) for k, v in data.items()}
+
+
+mod("homeassistant.helpers.redact", async_redact_data=async_redact_data, REDACTED=REDACTED)
 mod("homeassistant.helpers.entity_platform", AddConfigEntryEntitiesCallback=object)
 mod(
     "homeassistant.helpers.update_coordinator",

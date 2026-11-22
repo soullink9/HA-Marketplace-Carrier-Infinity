@@ -227,10 +227,16 @@ class CarrierZone(CarrierEntity, ClimateEntity):
         `expect` holds the values the change produces (field name -> value). They are shown for a few
         minutes instead of re-reading the cloud, which keeps serving the old values for a while.
         """
+        done = 0
         try:
             for call in calls:
                 await call()
+                done += 1
         except CarrierApiError as err:
+            if done:
+                # Part of the change went through (say the setpoints, but not the hold): nothing is shown as written,
+                # so reload from Carrier rather than leave Home Assistant showing what the zone had before.
+                await self.coordinator.async_request_refresh()
             raise HomeAssistantError(f"Carrier cloud rejected the change: {err}") from err
         for name, value in expect.items():
             zone = None if name == "mode" else self._zone_id

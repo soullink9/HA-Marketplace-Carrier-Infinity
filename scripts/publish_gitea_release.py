@@ -94,11 +94,14 @@ def publish(gitea, tag, commit, title, notes, prerelease, file_paths):
         print(f"Updated release {title} ({tag})")
     for file_path in file_paths:
         name = Path(file_path).name
-        for asset in release.get("assets") or []:
-            if asset["name"] == name:  # replace, rather than end up with two files of the same name
-                gitea.call("DELETE", f"/releases/{release['id']}/assets/{asset['id']}")
-        gitea.upload(release["id"], file_path)
+        # Upload first, then delete the older copies of the same name: a failed upload leaves the release with its
+        # previous file instead of none.
+        new = gitea.upload(release["id"], file_path)
         print(f"Uploaded {name}")
+        for asset in release.get("assets") or []:
+            if asset["name"] == name and asset["id"] != new["id"]:
+                gitea.call("DELETE", f"/releases/{release['id']}/assets/{asset['id']}")
+                print(f"Removed the previous {name}")
     return release
 
 

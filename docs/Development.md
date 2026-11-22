@@ -46,7 +46,7 @@ python3 tests/test_energy_soak.py
 
 - `test_integration.py` runs the whole integration against stand-ins for Home Assistant (`stubs.py`) and
   recorded Carrier data (`fixtures/`, from carrier_api's test suite): the refresh and re-sign-in, reauth, websocket
-  messages, every control, the sensors, the setup forms, and that the manifest version matches the newest changelog
+  messages, every control, the sensors, the setup forms, diagnostics, log redaction, and that the manifest version matches the newest changelog
   entry. Nothing touches Carrier's cloud.
 - `test_energy_soak.py` plays years of a thermostat hour by hour (restarts, crashes, outages of up to 20 months, bad
   readings, Carrier's New Year quirks) and checks the electricity meter ends within a few kWh of Carrier's figures.
@@ -54,6 +54,10 @@ python3 tests/test_energy_soak.py
 
 Gitea's runner runs the integration tests, a 3-year simulation, `ruff`, `tests/test_release.py` and the zip build on every
 push; GitHub adds Home Assistant's `hassfest` and the Marketplace's checks. The file table below says which file does what.
+
+GitHub's workflows pin every action to a commit, with its version in a comment, and give each job only the access it
+needs. To update an action, look up the new version's commit (`git ls-remote https://github.com/actions/checkout
+refs/tags/v7.0.1`) and change both the commit and the comment.
 
 ## Tests and releases: the files
 

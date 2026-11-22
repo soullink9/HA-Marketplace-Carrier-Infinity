@@ -176,6 +176,7 @@ class FakeGitea(BaseHTTPRequestHandler):
     calls = []
     uploads = {}  # asset id -> (bytes, sent as "attachment", content type)
     next_id = 1
+    fail_uploads = False  # refuse every upload, like a Gitea whose disk is full
 
     def log_message(self, *args):
         """Keep the test's output to its results."""
@@ -222,6 +223,8 @@ class FakeGitea(BaseHTTPRequestHandler):
         if self.command == "DELETE" and match[3]:
             release["assets"] = [asset for asset in release["assets"] if asset["id"] != int(match[3])]
             return self.reply(204)
+        if self.command == "POST" and match[2] and not match[3] and FakeGitea.fail_uploads:
+            return self.reply(500, {"message": "upload failed"})
         if self.command == "POST" and match[2] and not match[3]:
             boundary = self.headers["Content-Type"].split("boundary=")[1].encode()
             part = body.split(b"--" + boundary)[1]
@@ -280,6 +283,15 @@ def test_publish():
         and release["name"] == "V1.9.0 again"
         and sorted(asset["name"] for asset in release["assets"]) == sorted(path.name for path in files),
         "run again for the same tag: the release is updated and its files replaced, not doubled",
+    )
+
+    before = sorted((asset["id"], asset["name"]) for asset in release["assets"])
+    FakeGitea.fail_uploads = True
+    result = run_publish("V1.9.0 upload fails")
+    FakeGitea.fail_uploads = False
+    check(
+        result.returncode != 0 and sorted((asset["id"], asset["name"]) for asset in release["assets"]) == before,
+        "an upload that fails: stops with an error, and the release keeps its previous files",
     )
 
     result = run_publish("V1.9.0", {"RELEASE_TOKEN": "wrong"})

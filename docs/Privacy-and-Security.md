@@ -17,9 +17,11 @@ The only outside connections are to **Carrier's cloud**, the same servers the Ca
 - It's stored in Home Assistant's own configuration storage, like any other integration's sign-in, and sent only to
   Carrier.
 - **It's kept out of the logs.** The library underneath logs whole requests and replies at debug level; the integration
-  drops any of those lines that contain the password or Carrier's access and refresh tokens. When the live connection
-  drops, only the error message is logged, not a full traceback, because the connection's address contains the
-  access token.
+  replaces the password and Carrier's access and refresh tokens in those lines with `**REDACTED**` and keeps the rest,
+  including a token in the live connection's address or in an error's traceback. A message from the live connection
+  that can't be read is logged by its type and size only, not its contents.
+- **It's kept out of diagnostics.** The **Download diagnostics** file has your username, password and tokens
+  replaced with `**REDACTED**`.
 - **It's never retried blindly.** If Carrier rejects it, the integration stops and asks you for the new one, so a
   wrong password can't lock your Carrier account. An expired session is renewed once with the saved password before
   it gives up.
@@ -32,4 +34,5 @@ from dashboards shared with guests).
 
 ## Before you share a log
 
-Debug logs contain your thermostat's serial number and your home's settings. Check them before posting anywhere.
+Debug logs and the diagnostics file contain your thermostat's serial number and your home's settings. Check them
+before posting anywhere.

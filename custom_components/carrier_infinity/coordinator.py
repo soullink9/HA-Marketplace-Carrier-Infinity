@@ -12,7 +12,9 @@ Data flow:
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
+import re
 from time import monotonic
 from typing import Any
 
@@ -39,20 +41,72 @@ _LOGGER = logging.getLogger(__name__)
 type CarrierConfigEntry = ConfigEntry[CarrierCoordinator]
 
 
-class _HideSecrets(logging.Filter):
-    """Keep the Carrier password and access tokens out of the log.
+# Keys whose values are secrets, wherever they appear in a log line (JSON, a Python dict, a query string).
+_SECRET_KEYS = r"password|access_?token|refresh_?token|id_?token|token"
+_SECRETS = (
+    # "password": "..." in JSON, or 'password': '...' in a printed dict
+    re.compile(rf"""(["']?(?:{_SECRET_KEYS})["']?\s*:\s*)("(?:[^"\\]|\\.)*"|'(?:[^'\\]|\\.)*')""", re.IGNORECASE),
+    # ?Token=... in a URL (Carrier's websocket address carries the access token this way)
+    re.compile(rf"([?&](?:{_SECRET_KEYS})=)([^&\s\"']+)", re.IGNORECASE),
+    # Authorization: Bearer ...
+    re.compile(r"(\bBearer\s+)([^\s\"',]+)", re.IGNORECASE),
+)
+REDACTED = "**REDACTED**"
 
-    The gql library (used by carrier_api) logs whole request and response bodies at debug level. The
-    sign-in request contains the password and its reply the tokens, so those lines are dropped.
+# The loggers that can carry a secret: gql logs whole request and response bodies (the sign-in request holds the
+# password, its reply the tokens), carrier_api logs the variables of each change, and an error from the websocket
+# can quote its address, which holds the access token. A filter only sees records logged on its own logger, not
+# on child loggers, so each one is listed.
+_REDACTED_LOGGERS = (
+    "gql.transport.aiohttp",
+    "carrier_api.api_connection_graphql",
+    "carrier_api.api_websocket",
+    "carrier_api.api_websocket_data_updater",
+    __name__,
+)
+
+
+def redact(text: str) -> str:
+    """Return `text` with the value of every password and token in it replaced by REDACTED."""
+    for pattern in _SECRETS:
+        text = pattern.sub(lambda m: m[1] + REDACTED, text)
+    return text
+
+
+class _RedactSecrets(logging.Filter):
+    """Blank out passwords and tokens in log lines, and keep the rest of the line.
+
+    Works on the finished text (the message with its arguments filled in, and the traceback), so a secret is caught
+    whichever argument, nested object or exception carries it.
     """
 
+    carrier_infinity = True  # marks our filter, so it is added once even if this module is loaded again
+
     def filter(self, record: logging.LogRecord) -> bool:
-        """Return False (drop the line) when it carries a secret."""
-        text = str(record.args)
-        return not any(secret in text for secret in ("password", "access_token", "refresh_token"))
+        """Redact the record in place; never drops it."""
+        try:
+            message = record.getMessage()
+        except Exception:  # noqa: BLE001 - a broken log call: leave it for logging's own error report
+            return True
+        clean = redact(message)
+        if clean != message:
+            record.msg, record.args = clean, None
+        if record.exc_info and not record.exc_text:
+            record.exc_text = logging.Formatter().formatException(record.exc_info)
+        if record.exc_text:
+            record.exc_text = redact(record.exc_text)
+        return True
 
 
-logging.getLogger("gql.transport.aiohttp").addFilter(_HideSecrets())
+def install_log_redaction() -> None:
+    """Add the redacting filter to every logger that can carry a secret, once (setup runs again on each reload)."""
+    for name in _REDACTED_LOGGERS:
+        logger = logging.getLogger(name)
+        if not any(getattr(f, "carrier_infinity", False) for f in logger.filters):
+            logger.addFilter(_RedactSecrets())
+
+
+install_log_redaction()
 
 
 class CarrierCoordinator(DataUpdateCoordinator[dict[str, System]]):
@@ -134,7 +188,13 @@ class CarrierCoordinator(DataUpdateCoordinator[dict[str, System]]):
         try:
             await self.updater.message_handler(message)  # patches the System objects in place
         except Exception:  # noqa: BLE001 - one bad message must never take down the socket
-            _LOGGER.debug("Ignored websocket message: %s", message, exc_info=True)
+            # Type and size only: the body is the account's raw thermostat data.
+            _LOGGER.debug(
+                "Ignored websocket message (type %s, %d characters)",
+                _message_type(message),
+                len(message),
+                exc_info=True,
+            )
             return
         self.async_update_listeners()
 
@@ -161,3 +221,14 @@ class CarrierCoordinator(DataUpdateCoordinator[dict[str, System]]):
                 delay = RECONNECT_FIRST  # it had been connected a while: reconnect promptly
             await asyncio.sleep(delay)
             delay = min(delay * 2, RECONNECT_MAX)
+
+
+def _message_type(message: str) -> str:
+    """A websocket message's type (messageType, or name for some), for the log; "unknown" if it has none."""
+    try:
+        data = json.loads(message)
+    except ValueError:
+        return "unknown (not JSON)"
+    if not isinstance(data, dict):
+        return "unknown"
+    return str(data.get("messageType") or data.get("name") or "unknown")[:40]

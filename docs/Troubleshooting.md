@@ -62,7 +62,10 @@ On the integration's page choose **Enable debug logging**, reproduce the problem
 download the log. The password and Carrier's tokens are kept out of it, but it contains your thermostat's serial
 number, so check it before posting.
 
+**Download diagnostics** on the integration's page gives everything Carrier reports for your systems, with your
+username, password and tokens redacted. Attach it to an issue alongside the log.
+
 ## Still stuck
 
 [Open an issue](https://github.com/soullink9/HA-Marketplace-Carrier-Infinity/issues/new/choose) with the Carrier form:
-your versions, the thermostat's model and software version, and the log.
+your versions, the thermostat's model and software version, the log, and the diagnostics file.

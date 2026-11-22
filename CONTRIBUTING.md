@@ -10,9 +10,10 @@ check a change, and how to release one.
 - **All cloud traffic goes through carrier_api.** The integration never builds its own requests to Carrier.
   [carrier_api](https://github.com/dahlb/carrier_api) knows Carrier's private API and is updated when Carrier changes
   it; the version is pinned in `manifest.json` (see [Updating carrier_api](#updating-carrier_api)).
-- **Secrets stay out of the log.** The password and Carrier's tokens must never be logged. `coordinator.py` filters
-  the gql library's debug output, and websocket errors are logged as a message only (a traceback can include the
-  token, which is part of the websocket address).
+- **Secrets stay out of the log and diagnostics.** The password and Carrier's tokens must never be logged.
+  `coordinator.py` redacts them (value only, the line is kept) in the logs of gql, carrier_api and the integration,
+  tracebacks included; add any new logger that can carry them to `_REDACTED_LOGGERS`. Never log a websocket message's
+  body. `diagnostics.py` redacts the username, password and tokens with Home Assistant's `async_redact_data`.
 - **Never sign in over and over.** A rejected password stops the integration and asks the user (reauth), so a
   wrong password can't lock the Carrier account.
 - **The electricity meter only goes up, and its saves keep loading.** Its state is saved by Home Assistant (see

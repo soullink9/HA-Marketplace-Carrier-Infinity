@@ -8,6 +8,7 @@ Run: python3 tests/test_integration.py      (needs carrier-api: pip install -r t
 import asyncio
 import copy
 from datetime import datetime, timedelta
+import importlib
 import json
 import logging
 from pathlib import Path
@@ -30,7 +31,7 @@ from carrier_api import (
 )
 
 import carrier_infinity  # noqa: F401 - the integration's own modules load cleanly
-from carrier_infinity import climate, config_flow, coordinator as coord_mod, sensor
+from carrier_infinity import climate, config_flow, coordinator as coord_mod, diagnostics, sensor
 from carrier_infinity.const import DOMAIN, EXPECT_SECONDS
 
 RESULTS = {"pass": 0, "fail": 0}
@@ -47,7 +48,7 @@ class FakeApi:
 
     def __init__(self):
         """Start with a valid session, no recorded calls and no failures queued."""
-        self.calls, self.refresh_token, self.fail_with = [], "token", []
+        self.calls, self.refresh_token, self.fail_with, self.fail_on = [], "token", [], None
         self.api_websocket = types.SimpleNamespace(callback_add=lambda cb: None)
 
     async def load_data(self):
@@ -65,6 +66,8 @@ class FakeApi:
         async def call(*args, **kwargs):
             if self.fail_with:
                 raise self.fail_with.pop(0)
+            if name == self.fail_on:
+                raise CarrierApiGraphqlError(f"{name} refused")
             self.calls.append((name, [a.value if hasattr(a, "value") else a for a in args]))
 
         return call
@@ -127,8 +130,15 @@ async def test_coordinator():
     check(
         "websocket message updates the data and the entities", zone.humidity == 34 and c.listener_updates == before + 1
     )
-    await c._on_message("not json")
+    with CapturedLog(coord_mod._LOGGER) as log:
+        await c._on_message("not json")
+        await c._on_message('{"messageType":"InfinityStatus","deviceId":"' + serial + '","zones":"private-body"}')
     check("a broken websocket message is ignored", c.listener_updates == before + 1)
+    check(
+        "an ignored websocket message is logged by type and size, never its body",
+        "private-body" not in log.text and "not json" not in log.text and "InfinityStatus" in log.text,
+        log.text,
+    )
     await c._on_message('{"messageType":"InfinityStatus","deviceId":"OTHER","zones":[{"id":"1","rh":99}]}')
     check("a message for another system changes nothing", c.data[serial].status.zones[0].humidity == 34)
     await c._on_message(message("heartbeat_with_no_device_id", serial))
@@ -228,6 +238,18 @@ async def test_climate():
     except HomeAssistantError:
         check("a rejected change is reported", True)
     check("a rejected change is not shown", z.hvac_mode == HVACMode.COOL, z.hvac_mode)
+    refreshes = getattr(c, "refresh_requests", 0)
+    check("a change rejected outright doesn't reload from Carrier", refreshes == 0, refreshes)
+
+    c.api.fail_on = "set_config_hold"  # the setpoints are written, the hold is refused
+    try:
+        await z.async_set_temperature(temperature=69.0)
+        check("half-applied change (setpoints but no hold) is reported", False, "no error")
+    except HomeAssistantError:
+        check("half-applied change (setpoints but no hold) is reported", True)
+    check("half-applied change: reloads from Carrier to show what the zone has now", c.refresh_requests == 1)
+    check("half-applied change: the requested values aren't shown as if written", z.native_target_temperature != 69.0)
+    c.api.fail_on = None
 
     real = coord_mod.monotonic
     coord_mod.monotonic = lambda: real() + EXPECT_SECONDS + 1
@@ -353,13 +375,105 @@ async def test_config_flow():
     )
 
 
+class CapturedLog(logging.Handler):
+    """Collects what a logger writes, formatted as a log file would show it (with tracebacks)."""
+
+    def __init__(self, logger):
+        """Capture `logger` (a Logger or a name) at debug level while in a with block."""
+        super().__init__(logging.DEBUG)
+        self.logger = logging.getLogger(logger) if isinstance(logger, str) else logger
+        self.lines = []
+
+    def emit(self, record):
+        """Keep the formatted line."""
+        self.lines.append(self.format(record))
+
+    @property
+    def text(self):
+        """Everything captured, as one string."""
+        return "\n".join(self.lines)
+
+    def __enter__(self):
+        """Start capturing."""
+        self.level_before = self.logger.level
+        self.logger.setLevel(logging.DEBUG)
+        self.logger.addHandler(self)
+        return self
+
+    def __exit__(self, *exc):
+        """Stop capturing."""
+        self.logger.removeHandler(self)
+        self.logger.setLevel(self.level_before)
+
+
+async def test_diagnostics():
+    """The diagnostics download: Carrier's data is there, the account and its secrets are not."""
+    print("diagnostics")
+    c = await new_coordinator()
+    c.config_entry.runtime_data = c
+    result = await diagnostics.async_get_config_entry_diagnostics(object(), c.config_entry)
+    text = json.dumps(result, default=str)
+    check(
+        "username, password, title and unique id are redacted",
+        "me@example.com" not in text and '"pw"' not in text and result["entry"]["data"]["password"] == "**REDACTED**",
+        result["entry"],
+    )
+    check("each system's data is included", [s["serial"] for s in result["systems"]] == ["SERIALXXX"])
+
+
+def test_log_redaction():
+    """Passwords and tokens are blanked in the log; the rest of each line, and every line, is kept."""
+    print("log redaction")
+    gql_body = '{"query": "mutation assistedLogin", "variables": {"input": {"password": "hunter2", "username": "me"}}}'
+    reply = '{"data": {"assistedLogin": {"data": {"access_token": "AT.123", "refresh_token": "RT-456"}}}}'
+    with CapturedLog("gql.transport.aiohttp") as log:
+        logging.getLogger("gql.transport.aiohttp").info(">>> %s", gql_body)
+        logging.getLogger("gql.transport.aiohttp").info("<<< %s", reply)
+        logging.getLogger("gql.transport.aiohttp").info("%s", {"password": "pw2", "zones": []})
+    check(
+        "gql's sign-in request and reply: password and tokens blanked, lines kept",
+        len(log.lines) == 3
+        and not any(s in log.text for s in ("hunter2", "AT.123", "RT-456", "pw2"))
+        and "assistedLogin" in log.text
+        and "'zones': []" in log.text,
+        log.text,
+    )
+
+    with CapturedLog(coord_mod._LOGGER) as log:
+        coord_mod._LOGGER.debug("dropped: %s", "403, url='wss://realtime.example/?Token=eyJ.secret.sig'")
+        coord_mod._LOGGER.debug("headers %s", {"Authorization": "Bearer eyJ.other.sig"})
+        try:
+            raise ValueError("connect to wss://realtime.example/?Token=eyJ.in.traceback failed")
+        except ValueError:
+            coord_mod._LOGGER.debug("websocket failed", exc_info=True)
+    check(
+        "a token in a URL, a Bearer header or a traceback is blanked",
+        "eyJ" not in log.text
+        and "?Token=**REDACTED**'" in log.text
+        and "Bearer **REDACTED**" in log.text
+        and "ValueError: connect to wss://realtime.example/?Token=**REDACTED** failed" in log.text,
+        log.text,
+    )
+    check(
+        "an ordinary line mentioning a password is kept whole",
+        coord_mod.redact("Carrier rejected the saved password") == "Carrier rejected the saved password",
+    )
+
+    def ours(name):
+        return [f for f in logging.getLogger(name).filters if getattr(f, "carrier_infinity", False)]
+
+    coord_mod.install_log_redaction()  # every setup (and so every reload) runs this
+    importlib.reload(coord_mod)  # and the module loading again adds no second copy either
+    check(
+        "the filter is on each logger exactly once, after a reload",
+        all(len(ours(name)) == 1 for name in coord_mod._REDACTED_LOGGERS),
+        {name: len(ours(name)) for name in coord_mod._REDACTED_LOGGERS},
+    )
+
+
 def test_files():
-    """The log filter, translations covering every key the code uses, and the version in one place per file."""
+    """Translations covering every key the code uses, and the version in one place per file."""
     print("files")
-    hide = coord_mod._HideSecrets()
-    leak = logging.LogRecord("gql", logging.DEBUG, "", 0, "%s", ({"password": "pw"},), None)
-    fine = logging.LogRecord("gql", logging.DEBUG, "", 0, "%s", ({"zones": []},), None)
-    check("secrets kept out of the log", not hide.filter(leak) and hide.filter(fine))
 
     base = REPO / "custom_components" / DOMAIN
     tr = json.loads((base / "translations" / "en.json").read_text())
@@ -394,7 +508,9 @@ async def main():
     await test_climate()
     await test_sensors()
     await test_config_flow()
+    await test_diagnostics()
     test_files()
+    test_log_redaction()  # last: it reloads the coordinator module
     SAVED.clear()
     SAVED.update(snapshot)
     print(f"\n{RESULTS['pass']} passed, {RESULTS['fail']} failed")
