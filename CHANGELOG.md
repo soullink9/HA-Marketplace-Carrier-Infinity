@@ -1,6 +1,8 @@
 # Changelog
 
-## Unreleased
+## 1.4.2 (2026-11-23)
+
+Fixes for the outdoor temperature sensor.
 
 ### Integration
 
