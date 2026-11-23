@@ -28,6 +28,7 @@ from carrier_api import (
     CarrierApiConnectionError,
     CarrierApiGraphqlError,
     EnergyPeriod,
+    TemperatureUnits,
 )
 
 import carrier_infinity  # noqa: F401 - the integration's own modules load cleanly
@@ -267,6 +268,10 @@ async def test_sensors():
     serial = next(iter(c.data))
     out = sensor.OutdoorTemperature(c, serial)
     check("outdoor temperature", (out.native_value, out.native_unit_of_measurement) == (30.0, "°F"))
+    status = c.data[serial].status
+    status.temperature_unit = TemperatureUnits.CELSIUS
+    check("outdoor temperature stays in °F on a thermostat set to °C", out.native_unit_of_measurement == "°F")
+    status.temperature_unit = TemperatureUnits.FAHRENHEIT
 
     def set_energy(y1, y2=None):
         """Replace year1 (and year2) in the fixture: cooling carries the number, gas must be ignored."""
@@ -419,6 +424,7 @@ async def test_diagnostics():
         result["entry"],
     )
     check("each system's data is included", [s["serial"] for s in result["systems"]] == ["SERIALXXX"])
+    check("Carrier's raw status is included", result["systems"][0]["raw_status"]["oat"] == "30")
 
 
 def test_log_redaction():

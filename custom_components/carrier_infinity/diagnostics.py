@@ -1,6 +1,8 @@
 """Diagnostics: the "Download diagnostics" file Home Assistant offers on the integration's page.
 
-It holds the config entry and everything Carrier reports for each system, for attaching to a bug report. The
+It holds the config entry and everything Carrier reports for each system, for attaching to a bug report: the values as
+carrier_api read them, and Carrier's raw status as it arrived (so a reading carrier_api could not read, such as a blank
+outdoor temperature, shows what Carrier actually sent). The
 account's username (also the entry's title and unique id), its password and any token are replaced by REDACTED.
 """
 
@@ -34,7 +36,9 @@ async def async_get_config_entry_diagnostics(hass: HomeAssistant, entry: Carrier
         {
             "entry": entry.as_dict(),
             "last_update_success": coordinator.last_update_success,
-            "systems": [system.as_dict() for system in (coordinator.data or {}).values()],
+            "systems": [
+                {**system.as_dict(), "raw_status": system.status.raw} for system in (coordinator.data or {}).values()
+            ],
         },
         TO_REDACT,
     )

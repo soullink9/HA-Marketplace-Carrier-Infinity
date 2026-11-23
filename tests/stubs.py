@@ -207,7 +207,10 @@ class ClimateEntity(Entity):
                 raise TypeError(f"{cls.__name__} uses {name}, deprecated in Home Assistant 2026.11: use native_{name}")
 
 
-class SensorEntity(Entity): ...
+class SensorEntity(Entity):
+    @property
+    def native_unit_of_measurement(self):
+        return getattr(self, "_attr_native_unit_of_measurement", None)  # as in Home Assistant
 
 
 class RestoredExtraData:

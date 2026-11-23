@@ -1,5 +1,14 @@
 # Changelog
 
+## Unreleased
+
+### Integration
+
+- The outdoor temperature is always read as °F, which is how Carrier sends it (as ha_carrier found). On a thermostat
+  set to °C it was labelled °C, so the number was wrong; Home Assistant now converts it to your unit.
+- **Download diagnostics** now also holds Carrier's raw status for each system as it arrived, so a reading the
+  integration could not use (an outdoor temperature showing Unknown, for example) shows what Carrier actually sent.
+
 ## 1.4.1 (2026-11-22)
 
 Fixes from a security review.

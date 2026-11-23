@@ -56,7 +56,7 @@ fan speed of the activity the zone is running. Offered when the system has a fan
 
 | Sensor | What it shows |
 |---|---|
-| **Outdoor temperature** | The outdoor air temperature measured by the outdoor unit, in the unit the thermostat displays. |
+| **Outdoor temperature** | The outdoor air temperature measured by the outdoor unit. Carrier reports it in °F whatever the thermostat displays; Home Assistant shows it in your unit. Unknown when Carrier sends no reading. |
 | **Electricity** | Lifetime electricity used by the whole system, in kWh. Only ever counts up. See [Electricity Meter](Electricity-Meter.md). |
 
 ## How quickly things update

@@ -25,7 +25,7 @@ from __future__ import annotations
 
 from datetime import datetime, timedelta
 
-from carrier_api import EnergyPeriod, EnergyUsageMetric, TemperatureUnits
+from carrier_api import EnergyPeriod, EnergyUsageMetric
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorStateClass
 from homeassistant.const import UnitOfEnergy, UnitOfTemperature
 from homeassistant.core import HomeAssistant
@@ -60,6 +60,9 @@ class OutdoorTemperature(CarrierEntity, SensorEntity):
     _attr_translation_key = "outdoor_temperature"
     _attr_device_class = SensorDeviceClass.TEMPERATURE
     _attr_state_class = SensorStateClass.MEASUREMENT
+    # Carrier reports the outdoor temperature in Fahrenheit even when the thermostat displays Celsius (as ha_carrier
+    # found); Home Assistant converts it to your unit.
+    _attr_native_unit_of_measurement = UnitOfTemperature.FAHRENHEIT
 
     def __init__(self, coordinator: CarrierCoordinator, serial: str) -> None:
         """Create the sensor for the system with this serial."""
@@ -70,13 +73,6 @@ class OutdoorTemperature(CarrierEntity, SensorEntity):
     def native_value(self) -> float | None:
         """The latest outdoor temperature."""
         return self._system.status.outdoor_temperature
-
-    @property
-    def native_unit_of_measurement(self) -> str:
-        """The unit the thermostat is set to display; Home Assistant converts if yours differs."""
-        if self._system.status.temperature_unit == TemperatureUnits.CELSIUS:
-            return UnitOfTemperature.CELSIUS
-        return UnitOfTemperature.FAHRENHEIT
 
 
 class Electricity(CarrierEntity, RestoreEntity, SensorEntity):
